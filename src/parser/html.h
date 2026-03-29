@@ -34,12 +34,11 @@
  * @param error_buf   Buffer to write a human-readable error message into.
  *                    May be NULL if you don't need the message.
  * @param error_len   Size of error_buf.
- * @return            Root __html_node__* (caller owns it — free with htmlnode_free),
- *                    or NULL on failure.
+ * @return            Root __html_node__* (caller owns it — free with
+ * htmlnode_free), or NULL on failure.
  */
-__html_node__* html_parse_file(const char* path,
-                           char*       error_buf,
-                           size_t      error_len);
+__html_node__ *html_parse_file(const char *path, char *error_buf,
+                               size_t error_len);
 
 /**
  * Parse an HTML string in memory (useful for tests).
@@ -49,15 +48,14 @@ __html_node__* html_parse_file(const char* path,
  * @param error_len   Size of error_buf.
  * @return            Root __html_node__*, or NULL on failure.
  */
-__html_node__* html_parse_string(const char* html,
-                             char*       error_buf,
-                             size_t      error_len);
+__html_node__ *html_parse_string(const char *html, char *error_buf,
+                                 size_t error_len);
 
 /**
  * Debug helper: print the DOM tree to stdout with indentation.
  * @param node   Root node to print from.
  * @param depth  Initial indent level (pass 0 from user code).
  */
-void html_dump(const __html_node__* node, int depth);
+void html_dump(const __html_node__ *node, int depth);
 
 #endif /* HTMLUI_PARSER_HTML_H */

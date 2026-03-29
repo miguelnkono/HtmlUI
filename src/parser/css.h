@@ -4,7 +4,7 @@
  * CSS parser interface.
  * Reads a CSS file and produces a __css_rule_list__.
  *
- * Supported CSS subset (Milestone 1)
+ * Supported CSS subset
  * ------------------------------------
  *  - Tag selectors:            button { }
  *  - Class selectors:          .container { }
@@ -15,7 +15,7 @@
  *  - Single-line comments:     (not standard CSS, skipped gracefully)
  *  - Block comments:           (block comments are stripped)
  *
- * Not yet supported (future milestones)
+ * Not yet supported
  * ----------------------------------------
  *  - Pseudo-classes:   :hover, :focus, :active  (Milestone 7)
  *  - Pseudo-elements:  ::before, ::after
@@ -40,23 +40,19 @@
  * @param error_len  Size of error_buf.
  * @return           HTMLUI_OK on success, error code on failure.
  */
-int css_parse_file(const char* path,
-                   __css_rule_list__* list,
-                   char*        error_buf,
-                   size_t       error_len);
+int css_parse_file(const char *path, __css_rule_list__ *list, char *error_buf,
+                   size_t error_len);
 
 /**
  * Parse a CSS string in memory and append rules to list.
  * Useful for inline <style> blocks and unit tests.
  */
-int css_parse_string(const char* css,
-                     __css_rule_list__* list,
-                     char*        error_buf,
-                     size_t       error_len);
+int css_parse_string(const char *css, __css_rule_list__ *list, char *error_buf,
+                     size_t error_len);
 
 /**
  * Debug helper: print all rules in list to stdout.
  */
-void css_dump(const __css_rule_list__* list);
+void css_dump(const __css_rule_list__ *list);
 
 #endif /* HTMLUI_PARSER_CSS_H */

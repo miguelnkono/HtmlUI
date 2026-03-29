@@ -34,11 +34,11 @@
  *   - cascade_apply() has been called (node->style valid)
  *   - layout_run()    has been called (node->layout valid)
  */
-void paint_build(__html_node__* root, __display_list__* dl);
+void paint_build(__html_node__ *root, __display_list__ *dl);
 
 /**
  * Debug: print all commands in dl to stdout.
  */
-void paint_dump(const __display_list__* dl);
+void paint_dump(const __display_list__ *dl);
 
 #endif /* HTMLUI_PAINT_H */

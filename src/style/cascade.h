@@ -33,10 +33,8 @@
  * @param viewport_w  Window width  in px — used to resolve % widths.
  * @param viewport_h  Window height in px — used to resolve % heights.
  */
-void cascade_apply(__html_node__*         root,
-                   const __css_rule_list__* rules,
-                   float              viewport_w,
-                   float              viewport_h);
+void cascade_apply(__html_node__ *root, const __css_rule_list__ *rules,
+                   float viewport_w, float viewport_h);
 
 /**
  * Compute the CSS specificity score of a selector string.
@@ -46,7 +44,7 @@ void cascade_apply(__html_node__*         root,
  *
  * Exposed for testing.
  */
-int selector_specificity(const char* selector);
+int selector_specificity(const char *selector);
 
 /**
  * Returns non-zero if selector matches node.
@@ -61,11 +59,11 @@ int selector_specificity(const char* selector);
  *
  * Exposed for testing.
  */
-int selector_matches(const char* selector, const __html_node__* node);
+int selector_matches(const char *selector, const __html_node__ *node);
 
 /**
  * Debug: print the computed style of a node to stdout.
  */
-void computed_style_dump(const __computed_style__* s, const char* label);
+void computed_style_dump(const __computed_style__ *s, const char *label);
 
 #endif /* HTMLUI_STYLE_CASCADE_H */

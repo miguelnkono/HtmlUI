@@ -27,10 +27,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* =========================================================================
- * Internal parser state
- * ========================================================================= */
-
 typedef struct {
   const char *src; /* Full source string             */
   size_t len;      /* Length of src                  */
@@ -39,10 +35,6 @@ typedef struct {
   char *error;     /* Error buffer (may be NULL)     */
   size_t errlen;
 } Parser;
-
-/* -------------------------------------------------------------------------
- * Cursor helpers
- * ------------------------------------------------------------------------- */
 
 static char peek(Parser *p) {
   if (p->pos >= p->len)
@@ -79,10 +71,6 @@ static bool match_str(Parser *p, const char *str) {
     return false;
   return memcmp(p->src + p->pos, str, slen) == 0;
 }
-
-/* -------------------------------------------------------------------------
- * String building helpers
- * ------------------------------------------------------------------------- */
 
 /* Read characters into a heap buffer until stop_ch is found.
  * The stop character is NOT consumed. Caller must free the result. */
@@ -154,10 +142,6 @@ static char *str_trim(char *s) {
   return s;
 }
 
-/* -------------------------------------------------------------------------
- * void-element (self-closing) tag list
- * ------------------------------------------------------------------------- */
-
 static const char *VOID_TAGS[] = {"area",  "base",   "br",    "col",  "embed",
                                   "hr",    "img",    "input", "link", "meta",
                                   "param", "source", "track", "wbr",  NULL};
@@ -169,10 +153,10 @@ static bool is_void_tag(const char *tag) {
   return false;
 }
 
-/* -------------------------------------------------------------------------
+/*
  * Skip a comment <!-- ... --> or DOCTYPE <!DOCTYPE ...>
  * Precondition: cursor is at '<'
- * ------------------------------------------------------------------------- */
+ **/
 static void skip_comment_or_doctype(Parser *p) {
   /* consume '<' */
   advance(p);
@@ -221,18 +205,18 @@ static char *parse_attr_value(Parser *p) {
   }
 }
 
-/* -------------------------------------------------------------------------
+/*
  * Parse a tag's attributes.
  * Cursor must be positioned after the tag name.
  * Returns when '>' or '/>' is reached; does NOT consume it.
- * ------------------------------------------------------------------------- */
+ **/
 static void parse_attributes(Parser *p, __html_node__ *node) {
   while (!at_end(p)) {
     skip_whitespace(p);
     char c = peek(p);
 
     if (c == '>' || c == '/')
-      return; /* end of opening tag */
+      return;
     if (at_end(p))
       return;
 
@@ -259,15 +243,15 @@ static void parse_attributes(Parser *p, __html_node__ *node) {
   }
 }
 
-/* -------------------------------------------------------------------------
+/*
  * Forward declaration
- * ------------------------------------------------------------------------- */
+ **/
 static __html_node__ *parse_node(Parser *p);
 
-/* -------------------------------------------------------------------------
+/*
  * Parse children of a node until we hit </tag_name> or end of input.
  * tag_name is the parent's tag (so we know when to stop).
- * ------------------------------------------------------------------------- */
+ **/
 static void parse_children(Parser *p, __html_node__ *parent) {
   while (!at_end(p)) {
     skip_whitespace(p);
@@ -276,7 +260,7 @@ static void parse_children(Parser *p, __html_node__ *parent) {
 
     /* Check for a closing tag matching the parent */
     if (peek(p) == '<' && peek2(p) == '/') {
-      /* Peek ahead to see if it's our closing tag */
+
       size_t saved_pos = p->pos;
       int saved_line = p->line;
       p->pos += 2; /* skip '</' */
@@ -303,18 +287,15 @@ static void parse_children(Parser *p, __html_node__ *parent) {
   }
 }
 
-/* -------------------------------------------------------------------------
+/*
  * Parse one node (element or text).
  * Returns a newly allocated __html_node__*, or NULL on error / end.
- * ------------------------------------------------------------------------- */
+ **/
 static __html_node__ *parse_node(Parser *p) {
   skip_whitespace(p);
   if (at_end(p))
     return NULL;
 
-  /* ------------------------------------------------------------------
-   * Text node
-   * ------------------------------------------------------------------ */
   if (peek(p) != '<') {
     /* Collect text until the next '<' */
     char *text = read_until_char(p, '<');
@@ -329,17 +310,11 @@ static __html_node__ *parse_node(Parser *p) {
     return node;
   }
 
-  /* ------------------------------------------------------------------
-   * Comment or DOCTYPE
-   * ------------------------------------------------------------------ */
   if (peek(p) == '<' && peek2(p) == '!') {
     skip_comment_or_doctype(p);
     return NULL; /* comments produce no node */
   }
 
-  /* ------------------------------------------------------------------
-   * Closing tag encountered unexpectedly — skip it
-   * ------------------------------------------------------------------ */
   if (peek(p) == '<' && peek2(p) == '/') {
     while (!at_end(p) && peek(p) != '>')
       advance(p);
@@ -348,9 +323,6 @@ static __html_node__ *parse_node(Parser *p) {
     return NULL;
   }
 
-  /* ------------------------------------------------------------------
-   * Opening tag  <tagname attr1="v1" attr2 ...>
-   * ------------------------------------------------------------------ */
   advance(p); /* consume '<' */
   skip_whitespace(p);
 
@@ -392,10 +364,10 @@ static __html_node__ *parse_node(Parser *p) {
   return node;
 }
 
-/* -------------------------------------------------------------------------
+/*
  * Parse the full document and return the <html> root (or a synthetic root
  * if the source is a fragment).
- * ------------------------------------------------------------------------- */
+ **/
 static __html_node__ *parse_document(Parser *p) {
   /* Collect all top-level nodes */
   __html_node__ *root = NULL;
@@ -420,10 +392,9 @@ static __html_node__ *parse_document(Parser *p) {
   return root ? root : htmlnode_create("html");
 }
 
-/* =========================================================================
+/*
  * Public API
- * ========================================================================= */
-
+ * */
 __html_node__ *html_parse_string(const char *html, char *error_buf,
                                  size_t error_len) {
   if (!html) {
@@ -488,10 +459,9 @@ __html_node__ *html_parse_file(const char *path, char *error_buf,
   return root;
 }
 
-/* =========================================================================
+/*
  * Debug dump
- * ========================================================================= */
-
+ * */
 void html_dump(const __html_node__ *node, int depth) {
   if (!node)
     return;

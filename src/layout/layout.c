@@ -132,7 +132,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
   int is_rev = (s->flex_direction == FLEX_DIRECTION_ROW_REVERSE ||
                 s->flex_direction == FLEX_DIRECTION_COLUMN_REVERSE);
 
-  /* ── Outer size on each axis ──────────────────────────────────────────
+  /* Outer size on each axis
    * Width:  explicit > max-width clamp > available width (always known).
    * Height: explicit > max-height clamp > available height IF given,
    *         otherwise we must shrink-wrap (computed in step 6).
@@ -193,17 +193,6 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
     b->content_height = ch;
     return;
   }
-  /* if (nc == 0) { */
-  /*   b->x = ox; */
-  /*   b->y = oy; */
-  /*   b->width = ow; */
-  /*   b->height = oh; */
-  /*   b->content_x = ox + cx_off(s); */
-  /*   b->content_y = oy + cy_off(s); */
-  /*   b->content_width = cw; */
-  /*   b->content_height = ch; */
-  /*   return; */
-  /* } */
 
   float *bm = calloc(nc, sizeof(float));
   float *fm = calloc(nc, sizeof(float));
@@ -226,7 +215,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
 
   float gap = s->gap;
 
-  /* ── Step 1: base main-axis sizes ────────────────────────────────────
+  /* base main-axis sizes
    * For column containers the main axis is height.
    * We call intrinsic_main with the known cross size (cw) so children
    * can measure themselves against the correct available width.         */
@@ -262,7 +251,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
   total_fixed += gap * (float)(nc - 1);
   float free_space = MAX2(0.0f, avail_main - total_fixed);
 
-  /* ── Step 2: flex-grow distribution ─────────────────────────────────  */
+  /* flex-grow distribution */
   for (int i = 0; i < nc; i++) {
     __computed_style__ *kcs = kids[i]->style;
     fm[i] = (gf[i] > 0 && total_grow > 0) ? (free_space * gf[i] / total_grow)
@@ -278,7 +267,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
     }
   }
 
-  /* ── Step 3: cross-axis sizes ────────────────────────────────────────
+  /* cross-axis sizes
    * For row containers: cross = height. Pass fm[i] as child width so
    *   the child can wrap text / measure height properly.
    * For column containers: cross = width. Use cw (always known).       */
@@ -316,7 +305,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
     max_cross = MAX2(max_cross, cs_[i] + mg_c);
   }
 
-  /* ── Step 4: justify-content spacing ─────────────────────────────────  */
+  /* justify-content spacing */
   float total_occ = gap * (float)(nc - 1);
   for (int i = 0; i < nc; i++) {
     __computed_style__ *kcs = kids[i]->style;
@@ -355,7 +344,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
   } break;
   }
 
-  /* ── Step 5: final placement ──────────────────────────────────────────  */
+  /* final placement */
   float px = ox + cx_off(s);
   float py = oy + cy_off(s);
   float cursor = start;
@@ -409,7 +398,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
       cursor += fm[i] + mms + mme + between;
   }
 
-  /* ── Step 6: finalize container size ─────────────────────────────────
+  /* finalize container size
    * If height was not definite, shrink-wrap to actual content.          */
   float fow = ow;
   float foh = oh;
@@ -445,7 +434,7 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
   free(kids);
 }
 
-/* ── Dispatcher ───────────────────────────────────────────────────────── */
+/* Dispatcher */
 static void layout_node(__html_node__ *n, float cw, float ch, float ox,
                         float oy) {
   if (!n || !n->style)
@@ -473,7 +462,7 @@ static void layout_node(__html_node__ *n, float cw, float ch, float ox,
     layout_block(n, cw, ch, ox, oy);
 }
 
-/* ── Public API ───────────────────────────────────────────────────────── */
+/* Public API */
 void layout_run(__html_node__ *root, float vw, float vh) {
   if (!root)
     return;

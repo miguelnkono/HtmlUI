@@ -44,13 +44,13 @@
  * @param viewport_w  Available width  in pixels (window content width).
  * @param viewport_h  Available height in pixels (window content height).
  */
-void layout_run(__html_node__* root, float viewport_w, float viewport_h);
+void layout_run(__html_node__ *root, float viewport_w, float viewport_h);
 
 /**
  * Debug: print the layout box of a node and all its descendants.
  * @param node   Root of the subtree to print.
  * @param depth  Initial indent (pass 0).
  */
-void layout_dump(const __html_node__* node, int depth);
+void layout_dump(const __html_node__ *node, int depth);
 
 #endif /* HTMLUI_LAYOUT_H */
