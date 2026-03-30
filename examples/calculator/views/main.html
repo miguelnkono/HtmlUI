@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Calculator</title>
+  </head>
+  <body>
+    <div class="app">
+      <h1 class="title">Calculator</h1>
+
+      <!-- Input row -->
+      <div class="row">
+        <input id="input-a" type="text" placeholder="First number" />
+        <input id="input-b" type="text" placeholder="Second number" />
+      </div>
+
+      <!-- Operator buttons -->
+      <div class="row">
+        <button id="btn-add" class="btn btn-op">+</button>
+        <button id="btn-sub" class="btn btn-op">-</button>
+        <button id="btn-mul" class="btn btn-op">x</button>
+        <button id="btn-div" class="btn btn-op">/</button>
+      </div>
+
+      <!-- Selected operator display -->
+      <p id="op-label" class="op-label">No operator selected</p>
+
+      <!-- Calculate -->
+      <button id="btn-calc" class="btn btn-calc">Calculate</button>
+
+      <!-- Result -->
+      <div class="result-box">
+        <p class="result-label">Result</p>
+        <p id="result" class="result-value">—</p>
+      </div>
+
+      <!-- Error / status -->
+      <p id="status" class="status"></p>
+    </div>
+  </body>
+</html>

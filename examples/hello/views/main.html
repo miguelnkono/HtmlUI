@@ -5,25 +5,15 @@
     <title>HelloWorld</title>
   </head>
   <body>
-    <div class="app" id="root">
-      <h1 id="title">Hello, htmlui!</h1>
+    <div class="container">
+      <h1>Calculator App</h1>
 
-      <p id="subtitle">
-        A native desktop UI rendered from HTML and CSS. No browser engine. Pure
-        C + SDL3.
-      </p>
-
-      <div class="row">
-        <button id="btn-greet" class="btn btn-primary">Say Hello</button>
-        <button id="btn-reset" class="btn btn-secondary">Reset</button>
+      <div class="numbers">
+        <button id="first-number" class="btn">0</button>
+        <button id="second-number" class="btn">0</button>
       </div>
 
-      <p id="status" class="status-text"></p>
-
-      <div class="card">
-        <h2>Enter your name</h2>
-        <input id="name-input" type="text" placeholder="Your name..." />
-      </div>
+      <p id="result" class="result">00</p>
     </div>
   </body>
 </html>

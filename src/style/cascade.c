@@ -678,6 +678,20 @@ static void cascade_node(__html_node__ *node, const __css_rule_list__ *rules,
                          float rfs) {
   if (!node || strcmp(node->tag, "#text") == 0)
     return;
+
+  if (strcmp(node->tag, "head") == 0 || strcmp(node->tag, "meta") == 0 ||
+      strcmp(node->tag, "title") == 0 || strcmp(node->tag, "link") == 0 ||
+      strcmp(node->tag, "script") == 0 || strcmp(node->tag, "style") == 0) {
+    __computed_style__ *s = malloc(sizeof(__computed_style__));
+    if (!s)
+      return;
+    *s = computed_style_defaults();
+    s->display = DISPLAY_NONE;
+    free(node->style);
+    node->style = s;
+    return; /* don't recurse into children either */
+  }
+
   float pw = (ps && !isnan(ps->width)) ? ps->width : vpw;
   float ph = (ps && !isnan(ps->height)) ? ps->height : vph;
   float pfs = ps ? ps->font_size : rfs;

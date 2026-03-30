@@ -87,10 +87,13 @@ struct Sdl3Renderer_t {
   int window_h;
 };
 
-/* =========================================================================
- * Lifecycle
- * ========================================================================= */
+SDL_Window *sdl3_renderer_get_window(Sdl3Renderer *sr) {
+  return sr ? sr->window : NULL;
+}
 
+/*
+ * Lifecycle
+ **/
 Sdl3Renderer *sdl3_renderer_create(const char *title, int w, int h,
                                    bool resizable, bool vsync) {
   if (!SDL_Init(SDL_INIT_VIDEO)) {

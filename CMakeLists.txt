@@ -163,6 +163,10 @@ if (HTMLUI_BUILD_EXAMPLES AND HTMLUI_ENABLE_SDL3)
     target_include_directories(hello_app PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    add_executable(calculator_app examples/calculator/main.c)
+    target_link_libraries(calculator_app PRIVATE htmlui)
+    target_include_directories(calculator_app PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include)
     # The app loads views/main.html and styles/app.css relative to CWD.
     # Set the working directory so those paths resolve correctly when run
     # from the build directory via ctest or directly.

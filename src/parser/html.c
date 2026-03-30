@@ -282,7 +282,7 @@ static void parse_children(Parser *p, __html_node__ *parent) {
 
     __html_node__ *child = parse_node(p);
     if (!child)
-      break;
+      continue;
     htmlnode_append_child(parent, child);
   }
 }
