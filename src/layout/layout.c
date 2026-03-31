@@ -363,8 +363,13 @@ static void layout_flex(__html_node__ *n, float aw, float ah, float ox,
 
     float cross_avail = is_row ? ch : cw;
     float coff = 0;
-    __align_items__ al = (kcs->align_self != ALIGN_FLEX_START) ? kcs->align_self
-                                                               : s->align_items;
+    /* FIX: align_self default is ALIGN_SELF_AUTO (-1), not ALIGN_FLEX_START
+     * (0). Using ALIGN_FLEX_START as the sentinel made it impossible to
+     * explicitly override a parent's align-items:center back to flex-start on a
+     * child. */
+    __align_items__ al = (kcs->align_self != ALIGN_SELF_AUTO)
+                             ? (__align_items__)kcs->align_self
+                             : s->align_items;
     switch (al) {
     case ALIGN_FLEX_END:
       coff = cross_avail - cs_[i] - mcs;

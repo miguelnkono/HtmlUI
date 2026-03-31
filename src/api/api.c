@@ -1,15 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
-/**
- * src/api/api.c — Public C API implementation.
- *
- * This file glues all pipeline layers together:
- *   html_parse_file → css_parse_file → cascade_apply → layout_run
- *   → paint_build   → soft/sdl3 render
- *
- * It also implements the ui_poll_events / ui_render_frame loop and
- * all node query / mutation / event-binding functions.
- */
 
+#include "../../include/htmlui.h"
 #include "../layout/layout.h"
 #include "../paint/paint.h"
 #include "../parser/css.h"
@@ -17,32 +8,18 @@
 #include "../style/cascade.h"
 #include "ui_internal.h"
 
-#include "../../include/htmlui.h"
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-static void update_text_input(UI *ui) {
-#ifdef HTMLUI_SDL3
-  if (!ui->sdl3)
-    return;
-  SDL_Window *win = sdl3_renderer_get_window(ui->sdl3);
-  Node *focused = ui->events.focused;
-  if (focused && strcmp(focused->tag, "input") == 0) {
-    SDL_StartTextInput(win);
-  } else {
-    SDL_StopTextInput(win);
-  }
-#else
-  (void)ui;
-#endif
+/* =========================================================================
+ * Internal helpers
+ * ========================================================================= */
+static void set_error(UI *ui, const char *msg) {
+  if (ui)
+    snprintf(ui->last_error, sizeof(ui->last_error), "%s", msg);
 }
 
-/* Global back-pointer — set in ui_load, cleared in ui_destroy */
-// static UI *g_ui = NULL;
-/* Stamp owner_ui on every node in the subtree so mutations can find
- * their UI context without a global. Called after every parse/reload. */
 static void set_owner_ui(__html_node__ *node, UI *ui) {
   if (!node)
     return;
@@ -51,26 +28,11 @@ static void set_owner_ui(__html_node__ *node, UI *ui) {
     set_owner_ui(node->children[i], ui);
 }
 
-#ifdef HTMLUI_SDL3
-#include <SDL3/SDL.h>
-#endif
-
-/* =========================================================================
- * Internal helpers
- * ========================================================================= */
-
-static void set_error(UI *ui, const char *msg) {
-  if (ui)
-    snprintf(ui->last_error, sizeof(ui->last_error), "%s", msg);
-}
-
-/* Rebuild display list and push to renderer */
 static void repaint(UI *ui) {
   paint_build(ui->dom_root, &ui->display_list);
-
 #ifdef HTMLUI_SDL3
   if (ui->sdl3) {
-    Color bg = ui->dom_root && ui->dom_root->style
+    Color bg = (ui->dom_root && ui->dom_root->style)
                    ? ui->dom_root->style->background_color
                    : (Color){15, 17, 23, 255};
     sdl3_renderer_begin_frame(ui->sdl3, bg);
@@ -79,8 +41,6 @@ static void repaint(UI *ui) {
     return;
   }
 #endif
-
-  /* Software renderer */
   if (ui->soft) {
     Color bg = {15, 17, 23, 255};
     if (ui->dom_root && ui->dom_root->style)
@@ -90,7 +50,6 @@ static void repaint(UI *ui) {
   }
 }
 
-/* Run the full pipeline from dom_root + css_rules */
 static int run_pipeline(UI *ui) {
   if (!ui->dom_root)
     return -1;
@@ -102,15 +61,23 @@ static int run_pipeline(UI *ui) {
   return 0;
 }
 
-/* =========================================================================
- * Selector matching (simple subset — same logic as cascade.c)
- * ========================================================================= */
+static void update_text_input(UI *ui) {
+#ifdef HTMLUI_SDL3
+  if (!ui->sdl3)
+    return;
+  SDL_Window *win = sdl3_renderer_get_window(ui->sdl3);
+  Node *focused = ui->events.focused;
+  if (focused && strcmp(focused->tag, "input") == 0)
+    SDL_StartTextInput(win);
+  else
+    SDL_StopTextInput(win);
+#else
+  (void)ui;
+#endif
+}
 
-/* Forward: implemented in style/cascade.c; we re-declare to avoid a header dep
- */
 extern int selector_matches(const char *selector, const __html_node__ *node);
 
-/* Recursive DFS query helpers */
 static __html_node__ *query_one(__html_node__ *node, const char *sel) {
   if (!node)
     return NULL;
@@ -123,7 +90,6 @@ static __html_node__ *query_one(__html_node__ *node, const char *sel) {
   }
   return NULL;
 }
-
 static void query_all_r(__html_node__ *node, const char *sel,
                         __html_node__ ***out, int *count, int *cap) {
   if (!node)
@@ -140,9 +106,8 @@ static void query_all_r(__html_node__ *node, const char *sel,
 }
 
 /* =========================================================================
- * htmlui_options_default
+ * Options / error string
  * ========================================================================= */
-
 void htmlui_options_default(HtmluiOptions *opts) {
   if (!opts)
     return;
@@ -155,7 +120,6 @@ void htmlui_options_default(HtmluiOptions *opts) {
   opts->debug_layout = false;
   opts->debug_hover = false;
 }
-
 const char *htmlui_result_str(HtmluiResult r) {
   switch (r) {
   case HTMLUI_OK:
@@ -184,14 +148,12 @@ const char *htmlui_result_str(HtmluiResult r) {
 /* =========================================================================
  * ui_load
  * ========================================================================= */
-
 UI *ui_load(const char *html_path, const char *css_path,
             const HtmluiOptions *opts) {
   UI *ui = calloc(1, sizeof(UI));
   if (!ui)
     return NULL;
 
-  /* Apply options */
   htmlui_options_default(&ui->options);
   if (opts)
     ui->options = *opts;
@@ -205,24 +167,20 @@ UI *ui_load(const char *html_path, const char *css_path,
   display_list_init(&ui->display_list);
   css_rule_list_init(&ui->css_rules);
 
-  /* Store paths for hot-reload */
   ui->html_path = html_path ? strdup(html_path) : NULL;
   ui->css_path = css_path ? strdup(css_path) : NULL;
 
-  /* Parse HTML */
-  if (html_path) {
+  if (html_path)
     ui->dom_root =
         html_parse_file(html_path, ui->last_error, sizeof(ui->last_error));
-  } else {
+  else
     ui->dom_root = html_parse_string("<html><body></body></html>",
                                      ui->last_error, sizeof(ui->last_error));
-  }
   if (!ui->dom_root) {
     ui_destroy(ui);
     return NULL;
   }
 
-  /* Parse CSS */
   if (css_path) {
     if (css_parse_file(css_path, &ui->css_rules, ui->last_error,
                        sizeof(ui->last_error)) != 0) {
@@ -231,7 +189,6 @@ UI *ui_load(const char *html_path, const char *css_path,
     }
   }
 
-  /* Create software renderer (always) */
   ui->soft = soft_renderer_create(ui->window_w, ui->window_h);
   if (!ui->soft) {
     set_error(ui, "soft renderer OOM");
@@ -240,7 +197,6 @@ UI *ui_load(const char *html_path, const char *css_path,
   }
 
 #ifdef HTMLUI_SDL3
-  /* Try SDL3 if requested */
   if (ui->options.renderer == HTMLUI_RENDERER_SDL3) {
     ui->sdl3 = sdl3_renderer_create(ui->options.window_title, ui->window_w,
                                     ui->window_h, ui->options.resizable,
@@ -249,24 +205,18 @@ UI *ui_load(const char *html_path, const char *css_path,
       snprintf(ui->last_error, sizeof(ui->last_error),
                "SDL3 init failed — falling back to software renderer");
       fprintf(stderr, "[htmlui] %s\n", ui->last_error);
-      /* Non-fatal: fall through to soft renderer */
     }
   }
 #endif
 
-  /* Set global back-pointer so mutations can find the UI */
-  // g_ui = ui;
-  /* Run the full pipeline once */
-  // run_pipeline(ui);
   set_owner_ui(ui->dom_root, ui);
   run_pipeline(ui);
   return ui;
 }
 
 /* =========================================================================
- * ui_reload
+ * ui_reload  (FIX: set_owner_ui before run_pipeline)
  * ========================================================================= */
-
 HtmluiResult ui_reload(UI *ui) {
   if (!ui)
     return HTMLUI_ERR_NULL;
@@ -288,16 +238,16 @@ HtmluiResult ui_reload(UI *ui) {
       return HTMLUI_ERR_PARSE_CSS;
   }
 
+  /* FIX: set owner before pipeline runs so mark_dirty() can propagate */
+  set_owner_ui(ui->dom_root, ui);
   ui->dirty = true;
   run_pipeline(ui);
-  set_owner_ui(ui->dom_root, ui);
   return HTMLUI_OK;
 }
 
 /* =========================================================================
  * Lifecycle
  * ========================================================================= */
-
 bool ui_is_running(UI *ui) { return ui && ui->running; }
 
 void ui_destroy(UI *ui) {
@@ -320,15 +270,13 @@ const char *ui_last_error(UI *ui) {
 }
 
 /* =========================================================================
- * Querying
+ * Query
  * ========================================================================= */
-
 Node *ui_query(UI *ui, const char *selector) {
   if (!ui || !selector || !ui->dom_root)
     return NULL;
   return query_one(ui->dom_root, selector);
 }
-
 Node **ui_query_all(UI *ui, const char *selector, int *out_count) {
   if (out_count)
     *out_count = 0;
@@ -341,23 +289,16 @@ Node **ui_query_all(UI *ui, const char *selector, int *out_count) {
     *out_count = count;
   return result;
 }
-
-Node *node_parent(Node *node) { return node ? node->parent : NULL; }
-
-Node *node_child(Node *node, int i) {
-  if (!node || i < 0 || i >= node->child_count)
-    return NULL;
-  return node->children[i];
+Node *node_parent(Node *n) { return n ? n->parent : NULL; }
+Node *node_child(Node *n, int i) {
+  return (n && i >= 0 && i < n->child_count) ? n->children[i] : NULL;
 }
-
-int node_child_count(Node *node) { return node ? node->child_count : 0; }
-
-const char *node_tag(Node *node) { return node ? node->tag : NULL; }
-
-const char *node_get_attr(Node *node, const char *attr) {
-  if (!node || !attr)
+int node_child_count(Node *n) { return n ? n->child_count : 0; }
+const char *node_tag(Node *n) { return n ? n->tag : NULL; }
+const char *node_get_attr(Node *n, const char *a) {
+  if (!n || !a)
     return NULL;
-  return htmlattr_list_get(&node->attrs, attr);
+  return htmlattr_list_get(&n->attrs, a);
 }
 
 /* =========================================================================
@@ -371,19 +312,11 @@ static void node_mark_dirty(Node *node) {
     node->owner_ui->dirty = true;
 }
 
-/* Reach the owning UI from a node by walking to the root.
- * We store a back-pointer in the UI itself; for now we use a global. */
-
-/* =========================================================================
- * Mutation
- * ========================================================================= */
-
 void node_set_text(Node *node, const char *text) {
   if (!node)
     return;
   free(node->text_content);
   node->text_content = text ? strdup(text) : NULL;
-  /* Also update first #text child if present */
   for (int i = 0; i < node->child_count; i++) {
     if (strcmp(node->children[i]->tag, "#text") == 0) {
       free(node->children[i]->text_content);
@@ -401,27 +334,68 @@ void node_set_attr(Node *node, const char *attr, const char *value) {
   node_mark_dirty(node);
 }
 
+/* FIX: node_set_style() replaces an existing property in the inline style
+ * string in-place instead of always appending. The old implementation grew
+ * the style attribute by N bytes on every call with the same property,
+ * eventually hitting the 4096-byte buffer and losing declarations. */
 void node_set_style(Node *node, const char *property, const char *value) {
   if (!node || !property)
     return;
-  /* Build/update inline style string */
   const char *existing = htmlattr_list_get(&node->attrs, "style");
-  char buf[4096] = {0};
+
+  char out[4096] = {0};
+  int found = 0;
+
   if (existing) {
-    /* Replace or append property */
+    /* Walk the existing declarations; replace matching property, keep rest. */
     char tmp[4096];
     snprintf(tmp, sizeof(tmp), "%s", existing);
-    /* Simple approach: append; cascade will use last value */
-    /* GCC warns about potential truncation here but this is intentional:
-     * if the style string is huge we truncate gracefully. */
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wformat-truncation"
-    snprintf(buf, sizeof(buf), "%s; %s: %s", tmp, property, value);
-#pragma GCC diagnostic pop
-  } else {
-    snprintf(buf, sizeof(buf), "%s: %s", property, value);
+    char *sp = NULL, *d = strtok_r(tmp, ";", &sp);
+    while (d) {
+      /* Skip leading whitespace */
+      while (*d == ' ')
+        d++;
+      if (*d == '\0') {
+        d = strtok_r(NULL, ";", &sp);
+        continue;
+      }
+
+      char *colon = strchr(d, ':');
+      if (colon) {
+        *colon = '\0';
+        /* Trim the property token */
+        char *pk = d;
+        while (*pk == ' ')
+          pk++;
+        char *pe = pk + strlen(pk) - 1;
+        while (pe > pk && *pe == ' ')
+          *pe-- = '\0';
+
+        if (strcmp(pk, property) == 0) {
+          /* Replace this declaration */
+          size_t cur = strlen(out);
+          snprintf(out + cur, sizeof(out) - cur, "%s%s: %s",
+                   cur > 0 ? "; " : "", property, value);
+          found = 1;
+        } else {
+          /* Keep the original declaration */
+          size_t cur = strlen(out);
+          snprintf(out + cur, sizeof(out) - cur, "%s%s: %s",
+                   cur > 0 ? "; " : "", pk, colon + 1);
+        }
+      }
+      d = strtok_r(NULL, ";", &sp);
+    }
   }
-  htmlattr_list_set(&node->attrs, "style", buf);
+
+  if (!found) {
+    /* Property was not present — append */
+    size_t cur = strlen(out);
+    snprintf(out + cur, sizeof(out) - cur, "%s%s: %s", cur > 0 ? "; " : "",
+             property, value);
+  }
+
+  htmlattr_list_set(&node->attrs, "style", out);
   node_mark_dirty(node);
 }
 
@@ -432,7 +406,6 @@ void node_add_class(Node *node, const char *class_name) {
   if (!existing) {
     htmlattr_list_set(&node->attrs, "class", class_name);
   } else {
-    /* Check if already present */
     if (node_has_class(node, class_name))
       return;
     char buf[1024];
@@ -441,20 +414,15 @@ void node_add_class(Node *node, const char *class_name) {
   }
   node_mark_dirty(node);
 }
-
 void node_remove_class(Node *node, const char *class_name) {
   if (!node || !class_name)
     return;
   const char *existing = htmlattr_list_get(&node->attrs, "class");
   if (!existing)
     return;
-
-  char buf[1024] = {0};
-  char tmp[1024];
+  char buf[1024] = {0}, tmp[1024];
   snprintf(tmp, sizeof(tmp), "%s", existing);
-
-  char *saveptr = NULL;
-  char *tok = strtok_r(tmp, " ", &saveptr);
+  char *sp = NULL, *tok = strtok_r(tmp, " ", &sp);
   int first = 1;
   while (tok) {
     if (strcmp(tok, class_name) != 0) {
@@ -463,12 +431,11 @@ void node_remove_class(Node *node, const char *class_name) {
       strncat(buf, tok, sizeof(buf) - strlen(buf) - 1);
       first = 0;
     }
-    tok = strtok_r(NULL, " ", &saveptr);
+    tok = strtok_r(NULL, " ", &sp);
   }
   htmlattr_list_set(&node->attrs, "class", buf);
   node_mark_dirty(node);
 }
-
 void node_toggle_class(Node *node, const char *class_name) {
   if (!node || !class_name)
     return;
@@ -477,7 +444,6 @@ void node_toggle_class(Node *node, const char *class_name) {
   else
     node_add_class(node, class_name);
 }
-
 bool node_has_class(Node *node, const char *class_name) {
   if (!node || !class_name)
     return false;
@@ -502,11 +468,7 @@ void node_set_visible(Node *node, bool visible) {
   if (!node)
     return;
   if (!visible) {
-    /* Save the current CSS display value before hiding, so we can
-     * restore it exactly on show rather than relying on re-cascade. */
-    if (!node->force_hidden) { /* only save when transitioning to hidden */
-      const char *current = htmlattr_list_get(&node->attrs, "style");
-      /* Extract the display value from computed style if available */
+    if (!node->force_hidden) {
       free(node->saved_display);
       node->saved_display = NULL;
       if (node->style) {
@@ -520,20 +482,15 @@ void node_set_visible(Node *node, bool visible) {
         case DISPLAY_INLINE_BLOCK:
           node->saved_display = strdup("inline-block");
           break;
-        case DISPLAY_BLOCK: /* fall-through — block is the default */
         default:
           node->saved_display = strdup("block");
           break;
         }
       }
-      (void)current; /* suppress unused-variable warning */
     }
     node->force_hidden = true;
   } else {
     node->force_hidden = false;
-    /* Restore the display value via an inline style so the next
-     * cascade run uses it rather than the CSS-file value (which
-     * might be overridden by a more-specific rule). */
     if (node->saved_display) {
       node_set_style(node, "display", node->saved_display);
       free(node->saved_display);
@@ -542,66 +499,56 @@ void node_set_visible(Node *node, bool visible) {
   }
   node_mark_dirty(node);
 }
-
-bool node_is_visible(Node *node) {
-  if (!node)
-    return false;
-  /* force_hidden is the authoritative visibility flag.
-   * style->display reflects the last cascade run and may lag. */
-  return !node->force_hidden;
-}
+bool node_is_visible(Node *node) { return node ? !node->force_hidden : false; }
 
 /* =========================================================================
- * Event registration
+ * Event registration  (FIX: per-event userdata slots)
  * ========================================================================= */
-
-void node_on_click(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_click(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_click = (void (*)(void *))cb;
-  node->cb_userdata_click = user_data;
+  n->cb_click = (void (*)(void *))cb;
+  n->cb_userdata_click = ud;
 }
-
-void node_on_mousedown(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_mousedown(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_mousedown = (void (*)(void *))cb;
-  node->cb_userdata_click = user_data;
+  /* FIX: was writing ud to cb_userdata_click, clobbering the click handler's
+   * data */
+  n->cb_mousedown = (void (*)(void *))cb;
+  n->cb_userdata_mousedown = ud;
 }
-
-void node_on_mouseup(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_mouseup(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_mouseup = (void (*)(void *))cb;
-  node->cb_userdata_click = user_data;
+  /* FIX: same as above */
+  n->cb_mouseup = (void (*)(void *))cb;
+  n->cb_userdata_mouseup = ud;
 }
-
-void node_on_hover(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_hover(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_hover = (void (*)(void *))cb;
-  node->cb_userdata_hover = user_data;
+  n->cb_hover = (void (*)(void *))cb;
+  n->cb_userdata_hover = ud;
 }
-
-void node_on_keydown(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_keydown(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_keydown = (void (*)(void *))cb;
-  node->cb_userdata_keydown = user_data;
+  n->cb_keydown = (void (*)(void *))cb;
+  n->cb_userdata_keydown = ud;
 }
-
-void node_on_keyup(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_keyup(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_keyup = (void (*)(void *))cb;
-  node->cb_userdata_keydown = user_data;
+  /* FIX: was writing ud to cb_userdata_keydown */
+  n->cb_keyup = (void (*)(void *))cb;
+  n->cb_userdata_keyup = ud;
 }
-
-void node_on_change(Node *node, HtmluiEventCb cb, void *user_data) {
-  if (!node)
+void node_on_change(Node *n, HtmluiEventCb cb, void *ud) {
+  if (!n)
     return;
-  node->cb_change = (void (*)(void *))cb;
-  node->cb_userdata_change = user_data;
+  n->cb_change = (void (*)(void *))cb;
+  n->cb_userdata_change = ud;
 }
 
 void node_focus(Node *node) {
@@ -615,7 +562,6 @@ void node_focus(Node *node) {
   }
   node->is_focused = true;
 }
-
 void ui_blur(UI *ui) {
   if (!ui)
     return;
@@ -625,16 +571,14 @@ void ui_blur(UI *ui) {
   }
 }
 
-/*
+/* =========================================================================
  * Render loop
- **/
+ * ========================================================================= */
 void ui_poll_events(UI *ui) {
   if (!ui || !ui->running)
     return;
-
 #ifdef HTMLUI_SDL3
   if (ui->sdl3) {
-    /* Poll SDL3 events and translate to our event system */
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
       switch (e.type) {
@@ -651,8 +595,6 @@ void ui_poll_events(UI *ui) {
             if (current && strlen(current) > 0) {
               char buf[1024];
               snprintf(buf, sizeof(buf), "%s", current);
-              /* Remove last UTF-8 character (walk back over continuation bytes)
-               */
               size_t len = strlen(buf);
               while (len > 0 && (buf[len - 1] & 0xC0) == 0x80)
                 len--;
@@ -690,7 +632,6 @@ void ui_poll_events(UI *ui) {
             event_mouse_down(&ui->events, ui->dom_root, e.button.button);
         if (flags & EV_DIRTY)
           ui->dirty = true;
-        // TODO: needs checks
         update_text_input(ui);
         break;
       }
@@ -698,22 +639,18 @@ void ui_poll_events(UI *ui) {
         int flags = event_mouse_up(&ui->events, ui->dom_root, e.button.button);
         if (flags & EV_DIRTY)
           ui->dirty = true;
-        // TODO: needs checks
         update_text_input(ui);
         break;
       }
       case SDL_EVENT_TEXT_INPUT: {
         Node *focused = ui->events.focused;
         if (focused && strcmp(focused->tag, "input") == 0) {
-          /* Append typed text to the node's "value" attribute */
           const char *current = node_get_attr(focused, "value");
           char buf[1024] = {0};
           if (current)
             snprintf(buf, sizeof(buf), "%s", current);
-          /* e.text.text is a null-terminated UTF-8 string of the input */
           strncat(buf, e.text.text, sizeof(buf) - strlen(buf) - 1);
           node_set_attr(focused, "value", buf);
-          /* Show typed text as the node's visible text content */
           node_set_text(focused, buf);
           ui->dirty = true;
         }
@@ -724,7 +661,6 @@ void ui_poll_events(UI *ui) {
         ui->window_h = e.window.data2;
         if (ui->soft)
           soft_renderer_resize(ui->soft, ui->window_w, ui->window_h);
-
         cascade_apply(ui->dom_root, &ui->css_rules, (float)ui->window_w,
                       (float)ui->window_h);
         ui->dirty = true;
@@ -736,61 +672,44 @@ void ui_poll_events(UI *ui) {
     return;
   }
 #endif
-
-  /* Headless / software mode: no OS events to pump */
   (void)ui;
 }
 
 void ui_render_frame(UI *ui) {
-  if (!ui || !ui->running)
+  if (!ui || !ui->running || !ui->dirty)
     return;
-  if (!ui->dirty)
-    return;
-
-  /* Re-run full pipeline on dirty state */
   cascade_apply(ui->dom_root, &ui->css_rules, (float)ui->window_w,
                 (float)ui->window_h);
   layout_run(ui->dom_root, (float)ui->window_w, (float)ui->window_h);
   repaint(ui);
   ui->dirty = false;
 }
-
 void ui_invalidate(UI *ui) {
   if (ui)
     ui->dirty = true;
 }
 
-/* =========================================================================
- * Utility
- * ========================================================================= */
-
 int ui_window_width(UI *ui) { return ui ? ui->window_w : 0; }
 int ui_window_height(UI *ui) { return ui ? ui->window_h : 0; }
 
-void node_get_rect(Node *node, float *out_x, float *out_y, float *out_w,
-                   float *out_h) {
+void node_get_rect(Node *node, float *ox, float *oy, float *ow, float *oh) {
   if (!node || !node->layout) {
-    if (out_x)
-      *out_x = 0;
-    if (out_y)
-      *out_y = 0;
-    if (out_w)
-      *out_w = 0;
-    if (out_h)
-      *out_h = 0;
+    if (ox)
+      *ox = 0;
+    if (oy)
+      *oy = 0;
+    if (ow)
+      *ow = 0;
+    if (oh)
+      *oh = 0;
     return;
   }
-  if (out_x)
-    *out_x = node->layout->x;
-  if (out_y)
-    *out_y = node->layout->y;
-  if (out_w)
-    *out_w = node->layout->width;
-  if (out_h)
-    *out_h = node->layout->height;
+  if (ox)
+    *ox = node->layout->x;
+  if (oy)
+    *oy = node->layout->y;
+  if (ow)
+    *ow = node->layout->width;
+  if (oh)
+    *oh = node->layout->height;
 }
-
-/* =========================================================================
- * ui_load sets the global so mutations can find the UI
- * We hook this in at the bottom to avoid forward-decl issues.
- * ========================================================================= */
