@@ -659,8 +659,9 @@ static void inherit_from_parent(__computed_style__ *s,
   if (s->color.r == INIT.r && s->color.g == INIT.g && s->color.b == INIT.b &&
       s->color.a == INIT.a)
     s->color = p->color;
-  if (s->font_size == 16.0f)
+  if (isnan(s->font_size))
     s->font_size = p->font_size;
+  s->font_size = p->font_size;
   if (!s->font_family && p->font_family)
     s->font_family = strdup(p->font_family);
   if (s->font_weight == 400)
