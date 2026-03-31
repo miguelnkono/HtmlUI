@@ -1,19 +1,17 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>HelloWorld</title>
-  </head>
-  <body>
-    <div class="container">
-      <h1>Calculator App</h1>
-
-      <div class="numbers">
-        <button id="first-number" class="btn">0</button>
-        <button id="second-number" class="btn">0</button>
-      </div>
-
-      <p id="result" class="result">00</p>
+<!DOCTYPE html>
+<html>
+<body>
+  <div id="root" class="app">
+    <h1 id="title">Hello, htmlui!</h1>
+    <p id="status">Ready.</p>
+    <div class="card">
+      <p>Welcome to htmlui</p>
     </div>
-  </body>
+    <div style="display:flex; gap:8px;">
+      <button id="btn-greet" class="btn btn-primary">Greet</button>
+      <button id="btn-clear" class="btn btn-secondary">Clear</button>
+    </div>
+    <input id="name-input" type="text" placeholder="Enter name..." />
+  </div>
+</body>
 </html>

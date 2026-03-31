@@ -197,52 +197,71 @@ static GlyphEntry *cache_insert(SoftRenderer *sr, FT_Face face, uint32_t cp,
   return e;
 }
 
+/* One-slot font-family cache for resolve_face.
+ *
+ * FIX: these were plain statics inside the function. When a SoftRenderer
+ * was destroyed (FT_Done_FreeType called), the cached FT_Face became a
+ * dangling pointer. The next renderer got a fresh FT_Library at a different
+ * address, causing a cache miss — but the cleanup path then called
+ * FT_Done_Face on the already-freed stale face → segfault.
+ *
+ * Solution: move the cache to file scope so soft_renderer_destroy() can
+ * explicitly clear it before tearing down FreeType. */
+static char      s_last_family[256] = {0};
+static FT_Face   s_last_face        = NULL;
+static FT_Library s_last_lib        = NULL;
+
+/* Called from soft_renderer_destroy() before FT_Done_FreeType. */
+static void resolve_face_invalidate(FT_Library lib) {
+  if (s_last_lib != lib) return;
+  /* Do NOT call FT_Done_Face here — the library is about to be torn down
+   * and will clean up all its faces automatically. Just clear the pointers. */
+  s_last_face   = NULL;
+  s_last_lib    = NULL;
+  s_last_family[0] = '\0';
+}
+
 /* Resolve a CSS font-family name to an FT_Face via fc-match.
  * Falls back to sr->ft_face if the family cannot be found.
- * Uses a one-slot cache to avoid shelling out on every glyph. */
+ * Uses a one-slot cache to avoid shelling out on every glyph.
+ *
+ * Security note: family comes from a CSS property authored by the
+ * developer; sanitise before passing to the shell in production. */
 static FT_Face resolve_face(SoftRenderer *sr, const char *family) {
   if (!family || family[0] == '\0')
     return sr->ft_face;
 
-  static char last_family[256] = {0};
-  static FT_Face last_face = NULL;
-  static FT_Library last_lib = NULL;
-
-  if (last_lib == sr->ft_lib && strncmp(last_family, family, 255) == 0 &&
-      last_face)
-    return last_face;
+  if (s_last_lib == sr->ft_lib &&
+      strncmp(s_last_family, family, 255) == 0 &&
+      s_last_face)
+    return s_last_face;
 
   char cmd[512];
   snprintf(cmd, sizeof(cmd), "fc-match --format='%%{file}' '%s' 2>/dev/null",
            family);
   FILE *fp = popen(cmd, "r");
-  if (!fp)
-    return sr->ft_face;
+  if (!fp) return sr->ft_face;
 
   char path[512] = {0};
-  if (!fgets(path, sizeof(path), fp)) {
-    pclose(fp);
-    return sr->ft_face;
-  }
+  if (!fgets(path, sizeof(path), fp)) { pclose(fp); return sr->ft_face; }
   pclose(fp);
 
   size_t l = strlen(path);
-  while (l > 0 && (path[l - 1] == '\n' || path[l - 1] == '\r'))
-    path[--l] = '\0';
-  if (l == 0)
-    return sr->ft_face;
+  while (l > 0 && (path[l-1] == '\n' || path[l-1] == '\r')) path[--l] = '\0';
+  if (l == 0) return sr->ft_face;
 
   FT_Face face = NULL;
-  if (FT_New_Face(sr->ft_lib, path, 0, &face) != 0)
-    return sr->ft_face;
+  if (FT_New_Face(sr->ft_lib, path, 0, &face) != 0) return sr->ft_face;
 
-  if (last_face && last_face != sr->ft_face)
-    FT_Done_Face(last_face);
+  /* Free the previously cached face if it belongs to the same library
+   * and is not the renderer's default face. */
+  if (s_last_face && s_last_face != sr->ft_face && s_last_lib == sr->ft_lib)
+    FT_Done_Face(s_last_face);
 
-  last_face = face;
-  last_lib = sr->ft_lib;
-  strncpy(last_family, family, 255);
-  last_family[255] = '\0';
+  s_last_face = face;
+  s_last_lib  = sr->ft_lib;
+  strncpy(s_last_family, family, 255);
+  s_last_family[255] = '\0';
 
   fprintf(stderr, "[soft] Font switched: %s -> %s\n", family, path);
   return face;
@@ -396,8 +415,7 @@ SoftRenderer *soft_renderer_create(int width, int height) {
 }
 
 void soft_renderer_destroy(SoftRenderer *sr) {
-  if (!sr)
-    return;
+  if (!sr) return;
 #ifdef HTMLUI_FREETYPE
   for (int i = 0; i < GLYPH_CACHE_SIZE; i++) {
     GlyphEntry *e = sr->glyph_cache[i];
@@ -408,10 +426,13 @@ void soft_renderer_destroy(SoftRenderer *sr) {
       e = next;
     }
   }
-  if (sr->ft_face)
-    FT_Done_Face(sr->ft_face);
-  if (sr->ft_lib)
-    FT_Done_FreeType(sr->ft_lib);
+  /* FIX: clear the resolve_face one-slot cache before destroying the
+   * FreeType library. Without this, the cached FT_Face pointer becomes
+   * dangling and causes a segfault the next time a SoftRenderer is
+   * created and resolve_face tries to free the stale face. */
+  resolve_face_invalidate(sr->ft_lib);
+  if (sr->ft_face) FT_Done_Face(sr->ft_face);
+  if (sr->ft_lib)  FT_Done_FreeType(sr->ft_lib);
 #endif
   free(sr->pixels);
   free(sr);
