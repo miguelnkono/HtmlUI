@@ -219,7 +219,7 @@ int main(void) {
   }
 
   /* Query nodes */
-  app.input_a = ui_query(app.ui, "#input-a");
+  /* app.input_a = ui_query(app.ui, "#input-a"); */
   app.input_b = ui_query(app.ui, "#input-b");
   app.btn_add = ui_query(app.ui, "#btn-add");
   app.btn_sub = ui_query(app.ui, "#btn-sub");
