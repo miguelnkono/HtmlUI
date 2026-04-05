@@ -2,10 +2,7 @@
 /**
  * tests/test_parser.c
  *
- * Milestone 1 test harness.
- *
- * Reads an HTML file and a CSS file, runs both parsers,
- * and dumps the results to stdout.
+ * Reads an HTML file and a CSS file, runs both parsers, and dumps the results to stdout.
  *
  * Usage:
  *   ./test_parser <html_file> [css_file]
@@ -29,17 +26,15 @@
  */
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include "../src/internal/types.h"
 #include "../src/parser/html.h"
 #include "../src/parser/css.h"
 
-/* -------------------------------------------------------------------------
+/**
  * Simple pass/fail counter
- * ------------------------------------------------------------------------- */
-
+ **/
 static int passed = 0;
 static int failed = 0;
 
@@ -54,15 +49,14 @@ static int failed = 0;
         }                                                     \
     } while (0)
 
-/* =========================================================================
+/**
  * HTML parser unit tests
- * ========================================================================= */
-
+ **/
 static void test_html_parser(void) {
     printf("\n=== HTML Parser Tests ===\n");
     char errbuf[256];
 
-    /* -- Basic element -- */
+    // basic elements
     {
         __html_node__* root = html_parse_string("<div></div>", errbuf, sizeof(errbuf));
         CHECK(root != NULL, "parse simple <div>");
@@ -70,17 +64,21 @@ static void test_html_parser(void) {
             /* The parser wraps in <html> if no html root found,
              * or returns the first element as root. */
             __html_node__* node = (strcmp(root->tag, "html") == 0 && root->child_count > 0)
-                             ? root->children[0] : root;
-            CHECK(strcmp(node->tag, "div") == 0, "tag is 'div'");
+                ? root->children[0] : root;
+            CHECK(root->child_count == 2, "the children count should be 02");
+            CHECK(strcmp(node->tag, "body") == 0, "tag should a 'body'");
+            CHECK(strcmp(root->children[1]->tag, "div") == 0, "tag should a 'div'");
             htmlnode_free(root);
         }
     }
 
+    // TODO: Should check for the wrapping of metatags like <meta>, <link>, etc.
+
     /* -- Attributes -- */
     {
         __html_node__* root = html_parse_string(
-            "<button id=\"btn\" class=\"primary\">OK</button>",
-            errbuf, sizeof(errbuf));
+                "<button id=\"btn\" class=\"primary\">OK</button>",
+                errbuf, sizeof(errbuf));
         CHECK(root != NULL, "parse button with attributes");
         if (root) {
             /* Find the button node (may be wrapped in html) */
@@ -122,8 +120,8 @@ static void test_html_parser(void) {
     /* -- Self-closing / void tag -- */
     {
         __html_node__* root = html_parse_string(
-            "<div><input type=\"text\" /><br></div>",
-            errbuf, sizeof(errbuf));
+                "<div><input type=\"text\" /><br></div>",
+                errbuf, sizeof(errbuf));
         CHECK(root != NULL, "parse void/self-closing tags");
         if (root) htmlnode_free(root);
     }
@@ -131,8 +129,8 @@ static void test_html_parser(void) {
     /* -- Comment skipping -- */
     {
         __html_node__* root = html_parse_string(
-            "<!-- comment --><div></div>",
-            errbuf, sizeof(errbuf));
+                "<!-- comment --><div></div>",
+                errbuf, sizeof(errbuf));
         CHECK(root != NULL, "HTML comment skipped, div still parsed");
         if (root) htmlnode_free(root);
     }
@@ -179,9 +177,9 @@ static void test_css_parser(void) {
             CHECK(strcmp(list.rules[0].selector, "div") == 0, "selector is 'div'");
             CHECK(list.rules[0].decl_count == 1,              "1 declaration");
             CHECK(strcmp(list.rules[0].declarations[0].property, "color") == 0,
-                  "property is 'color'");
+                    "property is 'color'");
             CHECK(strcmp(list.rules[0].declarations[0].value, "red") == 0,
-                  "value is 'red'");
+                    "value is 'red'");
         }
         css_rule_list_free(&list);
     }
@@ -191,8 +189,8 @@ static void test_css_parser(void) {
         __css_rule_list__ list;
         css_rule_list_init(&list);
         css_parse_string(
-            ".btn { display: flex; background-color: #1d4ed8; color: #fff; }",
-            &list, errbuf, sizeof(errbuf));
+                ".btn { display: flex; background-color: #1d4ed8; color: #fff; }",
+                &list, errbuf, sizeof(errbuf));
         CHECK(list.count == 1,          "1 rule for .btn");
         CHECK(list.rules[0].decl_count == 3, ".btn has 3 declarations");
         css_rule_list_free(&list);
@@ -203,10 +201,10 @@ static void test_css_parser(void) {
         __css_rule_list__ list;
         css_rule_list_init(&list);
         css_parse_string(
-            "body { margin: 0; }"
-            "h1   { font-size: 24px; color: #111; }"
-            ".app { display: flex; flex-direction: column; }",
-            &list, errbuf, sizeof(errbuf));
+                "body { margin: 0; }"
+                "h1   { font-size: 24px; color: #111; }"
+                ".app { display: flex; flex-direction: column; }",
+                &list, errbuf, sizeof(errbuf));
         CHECK(list.count == 3, "3 rules parsed");
         css_rule_list_free(&list);
     }
@@ -216,7 +214,7 @@ static void test_css_parser(void) {
         __css_rule_list__ list;
         css_rule_list_init(&list);
         css_parse_string("h1, h2, h3 { font-weight: bold; }",
-                         &list, errbuf, sizeof(errbuf));
+                &list, errbuf, sizeof(errbuf));
         CHECK(list.count == 3, "comma selector expands to 3 rules");
         if (list.count == 3) {
             CHECK(strcmp(list.rules[0].selector, "h1") == 0, "first selector is h1");
@@ -231,9 +229,9 @@ static void test_css_parser(void) {
         __css_rule_list__ list;
         css_rule_list_init(&list);
         css_parse_string(
-            "/* This is a comment */\n"
-            "div { color: blue; /* inline comment */ font-size: 16px; }",
-            &list, errbuf, sizeof(errbuf));
+                "/* This is a comment */\n"
+                "div { color: blue; /* inline comment */ font-size: 16px; }",
+                &list, errbuf, sizeof(errbuf));
         CHECK(list.count == 1, "comments ignored, 1 rule parsed");
         css_rule_list_free(&list);
     }
@@ -243,14 +241,14 @@ static void test_css_parser(void) {
         __css_rule_list__ list;
         css_rule_list_init(&list);
         int r = css_parse_string(
-            "* { box-sizing: border-box; margin: 0; padding: 0; }\n"
-            "body { font-family: Arial, sans-serif; background-color: #0f1117; color: #e2e8f0; }\n"
-            ".app { display: flex; flex-direction: column; padding: 24px; gap: 16px; }\n"
-            "#title { font-size: 32px; font-weight: 700; color: #ffffff; }\n"
-            ".btn-primary { display: flex; background-color: #1d4ed8; color: #fff;\n"
-            "               padding: 8px 16px; border-radius: 6px; cursor: pointer; }\n"
-            ".btn-primary:hover { background-color: #2563eb; }\n",
-            &list, errbuf, sizeof(errbuf));
+                "* { box-sizing: border-box; margin: 0; padding: 0; }\n"
+                "body { font-family: Arial, sans-serif; background-color: #0f1117; color: #e2e8f0; }\n"
+                ".app { display: flex; flex-direction: column; padding: 24px; gap: 16px; }\n"
+                "#title { font-size: 32px; font-weight: 700; color: #ffffff; }\n"
+                ".btn-primary { display: flex; background-color: #1d4ed8; color: #fff;\n"
+                "               padding: 8px 16px; border-radius: 6px; cursor: pointer; }\n"
+                ".btn-primary:hover { background-color: #2563eb; }\n",
+                &list, errbuf, sizeof(errbuf));
         CHECK(r == 0, "realistic stylesheet parsed without error");
         CHECK(list.count >= 5, "at least 5 rules in realistic stylesheet");
         printf("\n  [CSS Dump]\n");
@@ -300,10 +298,9 @@ static void test_from_files(const char* html_path, const char* css_path) {
     }
 }
 
-/* =========================================================================
+/**
  * Entry point
- * ========================================================================= */
-
+ **/
 int main(int argc, char* argv[]) {
     printf("htmlui — Milestone 1: Parser Test Harness\n");
     printf("==========================================\n");

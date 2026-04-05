@@ -38,20 +38,20 @@ set(HTMLUI_SOURCES
     src/api/api.c
 )
 
-add_library(htmlui STATIC ${HTMLUI_SOURCES})
+add_library(${PROJECT_NAME} STATIC ${HTMLUI_SOURCES})
 
-target_include_directories(htmlui
+target_include_directories(${PROJECT_NAME}
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(htmlui PUBLIC m)
+target_link_libraries(${PROJECT_NAME} PUBLIC m)
 
 find_package(Freetype)
 if(FREETYPE_FOUND)
-    target_include_directories(htmlui PRIVATE ${FREETYPE_INCLUDE_DIRS})
-    target_link_libraries(htmlui PUBLIC ${FREETYPE_LIBRARIES})
-    target_compile_definitions(htmlui PUBLIC HTMLUI_FREETYPE=1)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${FREETYPE_INCLUDE_DIRS})
+    target_link_libraries(${PROJECT_NAME} PUBLIC ${FREETYPE_LIBRARIES})
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HTMLUI_FREETYPE=1)
     message(STATUS "FreeType: found")
 else()
     message(STATUS "FreeType: not found — text will use placeholder bars")
@@ -59,10 +59,10 @@ endif()
 
 if(HTMLUI_ENABLE_SDL3)
     find_package(SDL3 REQUIRED)
-    target_sources(htmlui PRIVATE src/render/sdl3.c)
-    target_link_libraries(htmlui PUBLIC SDL3::SDL3)
-    target_compile_definitions(htmlui PUBLIC HTMLUI_SDL3=1)
-    target_include_directories(htmlui PRIVATE ${SDL3_INCLUDE_DIRS})
+    target_sources(${PROJECT_NAME} PRIVATE src/render/sdl3.c)
+    target_link_libraries(${PROJECT_NAME} PUBLIC SDL3::SDL3)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC HTMLUI_SDL3=1)
+    target_include_directories(${PROJECT_NAME} PRIVATE ${SDL3_INCLUDE_DIRS})
     message(STATUS "SDL3 renderer: enabled")
 else()
     message(STATUS "SDL3 renderer: disabled (Milestone 4+)")
@@ -77,48 +77,48 @@ else()
     message(STATUS "Vulkan renderer: disabled (Milestone 9+)")
 endif()
 
-# Tests 
+# Tests
 if(HTMLUI_BUILD_TESTS)
     enable_testing()
 
     # Helper macro so each test target is defined consistently
     macro(add_htmlui_test target source)
         add_executable(${target} ${source})
-        target_link_libraries(${target} PRIVATE htmlui)
+        target_link_libraries(${target} PRIVATE ${PROJECT_NAME})
         target_include_directories(${target} PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/include)
     endmacro()
 
-    # Milestone 1 — Parser
+    #  Parser tests
     add_htmlui_test(test_parser tests/test_parser.c)
     add_test(NAME parser_unit_tests  COMMAND test_parser)
     add_test(NAME parser_file_test   COMMAND test_parser
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/views/main.html
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/styles/app.css)
 
-    # Milestone 2 — Cascade  (FIX: was missing from original CMakeLists.txt)
+    #  Cascade tests
     add_htmlui_test(test_cascade tests/test_cascade.c)
     add_test(NAME cascade_unit_tests COMMAND test_cascade)
     add_test(NAME cascade_file_test  COMMAND test_cascade
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/views/main.html
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/styles/app.css)
 
-    # Milestone 3 — Layout  (FIX: was missing from original CMakeLists.txt)
+    #  Layout tests
     add_htmlui_test(test_layout tests/test_layout.c)
     add_test(NAME layout_unit_tests COMMAND test_layout)
     add_test(NAME layout_file_test  COMMAND test_layout
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/views/main.html
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/styles/app.css)
 
-    # Milestone 4 — Display list + software renderer
+    #  Display list + software renderer tests
     add_htmlui_test(test_render tests/test_render.c)
     add_test(NAME render_test COMMAND test_render
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/views/main.html
         ${CMAKE_CURRENT_SOURCE_DIR}/examples/hello/styles/app.css
         /tmp/htmlui_render.ppm)
 
-    # Milestone 5 — Full public API
+    #  Full public API tests
     add_htmlui_test(test_milestone5 tests/test_milestone5.c)
     add_test(NAME milestone5_api COMMAND test_milestone5
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
@@ -126,16 +126,16 @@ if(HTMLUI_BUILD_TESTS)
     message(STATUS "Tests: enabled (5 suites)")
 endif()
 
-# Examples 
+# Examples
 if(HTMLUI_BUILD_EXAMPLES AND HTMLUI_ENABLE_SDL3)
     add_executable(hello_app examples/hello/main.c)
-    target_link_libraries(hello_app PRIVATE htmlui)
+    target_link_libraries(hello_app PRIVATE ${PROJECT_NAME})
     target_include_directories(hello_app PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
         ${CMAKE_CURRENT_SOURCE_DIR}/src)
 
     add_executable(calculator_app examples/calculator/main.c)
-    target_link_libraries(calculator_app PRIVATE htmlui)
+    target_link_libraries(calculator_app PRIVATE ${PROJECT_NAME})
     target_include_directories(calculator_app PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
@@ -147,8 +147,8 @@ elseif(HTMLUI_BUILD_EXAMPLES)
     message(STATUS "Examples: skipped (requires HTMLUI_ENABLE_SDL3=ON)")
 endif()
 
-# Install 
-install(TARGETS htmlui ARCHIVE DESTINATION lib LIBRARY DESTINATION lib)
+# Install
+install(TARGETS ${PROJECT_NAME} ARCHIVE DESTINATION lib LIBRARY DESTINATION lib)
 install(FILES include/htmlui.h DESTINATION include)
 
 message(STATUS "")

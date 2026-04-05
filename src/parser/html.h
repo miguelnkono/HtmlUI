@@ -44,12 +44,11 @@ __html_node__ *html_parse_file(const char *path, char *error_buf,
  * Parse an HTML string in memory (useful for tests).
  *
  * @param html        Null-terminated HTML source string.
- * @param error_buf   Error buffer — may be NULL.
+ * @param error_buf   Error buffer -  may be NULL.
  * @param error_len   Size of error_buf.
  * @return            Root __html_node__*, or NULL on failure.
  */
-__html_node__ *html_parse_string(const char *html, char *error_buf,
-                                 size_t error_len);
+__html_node__ *html_parse_string(const char *html, char *error_buf, size_t error_len);
 
 /**
  * Debug helper: print the DOM tree to stdout with indentation.

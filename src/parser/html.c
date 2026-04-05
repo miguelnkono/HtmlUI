@@ -13,12 +13,6 @@
  * The parser is intentionally lenient — it skips unknown constructs
  * rather than failing hard, because UI HTML files are developer-authored
  * and tend to be clean.
- *
- *  parse_document()
- *    └─ parse_node()          ← recursively builds the tree
- *         ├─ parse_tag()      ← reads tag name + attributes
- *         ├─ parse_text()     ← collects text until next '<'
- *         └─ (recurse for children until matching close tag)
  */
 
 #include "html.h"
@@ -28,27 +22,29 @@
 #include <string.h>
 
 typedef struct {
-  const char *src; /* Full source string             */
-  size_t len;      /* Length of src                  */
-  size_t pos;      /* Current read cursor            */
-  int line;        /* Current line number (for errors) */
-  char *error;     /* Error buffer (may be NULL)     */
+  const char *src;
+  size_t len;
+  size_t pos;
+  int line;
+  char *error; // error buffer(may be null)
   size_t errlen;
-} Parser;
+} __parser_t__; // __parser_t__
 
-static char peek(Parser *p) {
-  if (p->pos >= p->len)
+static bool at_end(__parser_t__ *p) { return p->pos >= p->len; }
+
+static char peek(__parser_t__ *p) {
+  if (at_end(p))
     return '\0';
   return p->src[p->pos];
 }
 
-static char peek2(Parser *p) {
+static char peek2(__parser_t__ *p) {
   if (p->pos + 1 >= p->len)
     return '\0';
   return p->src[p->pos + 1];
 }
 
-static char advance(Parser *p) {
+static char advance(__parser_t__ *p) {
   char c = peek(p);
   if (c == '\n')
     p->line++;
@@ -56,16 +52,14 @@ static char advance(Parser *p) {
   return c;
 }
 
-static bool at_end(Parser *p) { return p->pos >= p->len; }
-
 /* Skip whitespace characters. */
-static void skip_whitespace(Parser *p) {
+static void skip_whitespace(__parser_t__ *p) {
   while (!at_end(p) && isspace((unsigned char)peek(p)))
     advance(p);
 }
 
 /* Return true if the next bytes match str (does not advance). */
-static bool match_str(Parser *p, const char *str) {
+static bool match_str(__parser_t__ *p, const char *str) {
   size_t slen = strlen(str);
   if (p->pos + slen > p->len)
     return false;
@@ -74,7 +68,7 @@ static bool match_str(Parser *p, const char *str) {
 
 /* Read characters into a heap buffer until stop_ch is found.
  * The stop character is NOT consumed. Caller must free the result. */
-static char *read_until_char(Parser *p, char stop_ch) {
+static char *read_until_char(__parser_t__ *p, char stop_ch) {
   size_t start = p->pos;
   while (!at_end(p) && peek(p) != stop_ch)
     advance(p);
@@ -88,7 +82,7 @@ static char *read_until_char(Parser *p, char stop_ch) {
 }
 
 /* Same but stops at any character in the stop string. */
-static char *read_until_any(Parser *p, const char *stop_chars) {
+static char *read_until_any(__parser_t__ *p, const char *stop_chars) {
   size_t start = p->pos;
   while (!at_end(p) && !strchr(stop_chars, peek(p)))
     advance(p);
@@ -102,7 +96,7 @@ static char *read_until_any(Parser *p, const char *stop_chars) {
 }
 
 /* Read a tag name or attribute name: [a-zA-Z0-9_-:] */
-static char *read_name(Parser *p) {
+static char *read_name(__parser_t__ *p) {
   size_t start = p->pos;
   while (!at_end(p)) {
     char c = peek(p);
@@ -129,16 +123,19 @@ static char *read_name(Parser *p) {
 static char *str_trim(char *s) {
   if (!s)
     return s;
-  /* Leading */
+
+  // leading
   size_t start = 0;
   while (s[start] && isspace((unsigned char)s[start]))
     start++;
   if (start > 0)
     memmove(s, s + start, strlen(s) - start + 1);
-  /* Trailing */
+
+  // trailing
   size_t len = strlen(s);
   while (len > 0 && isspace((unsigned char)s[len - 1]))
     s[--len] = '\0';
+
   return s;
 }
 
@@ -157,15 +154,15 @@ static bool is_void_tag(const char *tag) {
  * Skip a comment <!-- ... --> or DOCTYPE <!DOCTYPE ...>
  * Precondition: cursor is at '<'
  **/
-static void skip_comment_or_doctype(Parser *p) {
-  /* consume '<' */
+static void skip_comment_or_doctype(__parser_t__ *p) {
+  // consume '<'
   advance(p);
   if (peek(p) == '!') {
     advance(p);
     if (match_str(p, "--")) {
-      /* HTML comment: <!-- ... --> */
+      // HTML comment: <!-- ... -->
       advance(p);
-      advance(p); /* skip "--" */
+      advance(p); // skip "--"
       while (!at_end(p)) {
         if (match_str(p, "-->")) {
           p->pos += 3;
@@ -174,27 +171,27 @@ static void skip_comment_or_doctype(Parser *p) {
         advance(p);
       }
     } else {
-      /* DOCTYPE or unknown <! construct — skip to '>' */
+      // DOCTYPE or unknown <! construct — skip to '>'
       while (!at_end(p) && peek(p) != '>')
         advance(p);
       if (!at_end(p))
-        advance(p); /* consume '>' */
+        advance(p); // consume '>'
     }
   }
 }
 
-/* -------------------------------------------------------------------------
+/**
  * Parse a quoted or unquoted attribute value.
  * Returns a heap-allocated string. Caller must free.
- * ------------------------------------------------------------------------- */
-static char *parse_attr_value(Parser *p) {
+ **/
+static char *parse_attr_value(__parser_t__ *p) {
   skip_whitespace(p);
   if (at_end(p))
     return NULL;
 
   char quote = peek(p);
   if (quote == '"' || quote == '\'') {
-    advance(p); /* consume opening quote */
+    advance(p); // consume opening quote
     char *val = read_until_char(p, quote);
     if (!at_end(p))
       advance(p); /* consume closing quote */
@@ -210,7 +207,7 @@ static char *parse_attr_value(Parser *p) {
  * Cursor must be positioned after the tag name.
  * Returns when '>' or '/>' is reached; does NOT consume it.
  **/
-static void parse_attributes(Parser *p, __html_node__ *node) {
+static void parse_attributes(__parser_t__ *p, __html_node__ *node) {
   while (!at_end(p)) {
     skip_whitespace(p);
     char c = peek(p);
@@ -246,13 +243,13 @@ static void parse_attributes(Parser *p, __html_node__ *node) {
 /*
  * Forward declaration
  **/
-static __html_node__ *parse_node(Parser *p);
+static __html_node__ *parse_node(__parser_t__ *p);
 
 /*
  * Parse children of a node until we hit </tag_name> or end of input.
  * tag_name is the parent's tag (so we know when to stop).
  **/
-static void parse_children(Parser *p, __html_node__ *parent) {
+static void parse_children(__parser_t__ *p, __html_node__ *parent) {
   while (!at_end(p)) {
     skip_whitespace(p);
     if (at_end(p))
@@ -272,9 +269,10 @@ static void parse_children(Parser *p, __html_node__ *parent) {
 
       if (matched) {
         if (!at_end(p) && peek(p) == '>')
-          advance(p); /* consume '>' */
-        return;       /* done with this parent */
+          advance(p); // consume '>'
+        return; // done with this parent
       }
+
       /* Not our tag — restore position and let parse_node handle it */
       p->pos = saved_pos;
       p->line = saved_line;
@@ -287,34 +285,37 @@ static void parse_children(Parser *p, __html_node__ *parent) {
   }
 }
 
-/*
+/**
  * Parse one node (element or text).
- * Returns a newly allocated __html_node__*, or NULL on error / end.
+ * Returns a newly allocated __html_node__*, or NULL on error/end.
  **/
-static __html_node__ *parse_node(Parser *p) {
+static __html_node__ *parse_node(__parser_t__ *p) {
   skip_whitespace(p);
   if (at_end(p))
     return NULL;
 
+  // parse a text
   if (peek(p) != '<') {
-    /* Collect text until the next '<' */
     char *text = read_until_char(p, '<');
     str_trim(text);
     if (!text || strlen(text) == 0) {
       free(text);
       return NULL;
     }
+
     /* Text nodes are represented as a synthetic "#text" element */
     __html_node__ *node = htmlnode_create("#text");
     node->text_content = text;
     return node;
   }
 
+  // if we hit a comment statement
   if (peek(p) == '<' && peek2(p) == '!') {
     skip_comment_or_doctype(p);
-    return NULL; /* comments produce no node */
+    return NULL;
   }
 
+  // parsing closing tag. Don't have to return a closing tag since we only register opening tags
   if (peek(p) == '<' && peek2(p) == '/') {
     while (!at_end(p) && peek(p) != '>')
       advance(p);
@@ -328,6 +329,7 @@ static __html_node__ *parse_node(Parser *p) {
 
   char *tag = read_name(p);
   if (!tag || strlen(tag) == 0) {
+    // TODO: find a better way of handling '<></>'(empty tags) tag
     free(tag);
     /* Skip to '>' and return nothing */
     while (!at_end(p) && peek(p) != '>')
@@ -368,8 +370,7 @@ static __html_node__ *parse_node(Parser *p) {
  * Parse the full document and return the <html> root (or a synthetic root
  * if the source is a fragment).
  **/
-static __html_node__ *parse_document(Parser *p) {
-  /* Collect all top-level nodes */
+static __html_node__ *parse_document(__parser_t__ *p) {
   __html_node__ *root = NULL;
 
   while (!at_end(p)) {
@@ -384,8 +385,11 @@ static __html_node__ *parse_document(Parser *p) {
     }
 
     /* Otherwise accumulate under a synthetic root */
-    if (!root)
+    if (!root) {
+      __html_node__ *body = htmlnode_create("body");
       root = htmlnode_create("html");
+      htmlnode_append_child(root, body);
+    }
     htmlnode_append_child(root, node);
   }
 
@@ -403,7 +407,7 @@ __html_node__ *html_parse_string(const char *html, char *error_buf,
     return NULL;
   }
 
-  Parser p = {
+  __parser_t__ p = {
       .src = html,
       .len = strlen(html),
       .pos = 0,
