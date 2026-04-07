@@ -5,22 +5,19 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* =========================================================================
- * Color
- * ========================================================================= */
+// color
 typedef struct {
   uint8_t r, g, b, a;
-} Color;
+} __color__;
+typedef __color__ Color;
 
 #define COLOR_TRANSPARENT ((Color){0, 0, 0, 0})
 #define COLOR_BLACK ((Color){0, 0, 0, 255})
 #define COLOR_WHITE ((Color){255, 255, 255, 255})
 
-Color color_parse(const char *str);
+__color__ color_parse(const char *str);
 
-/* =========================================================================
- * Attribute list
- * ========================================================================= */
+// attribute list
 typedef struct {
   char *key;
   char *value;
@@ -38,12 +35,14 @@ void htmlattr_list_set(__htmlattr_list__ *list, const char *key,
 const char *htmlattr_list_get(const __htmlattr_list__ *list, const char *key);
 void htmlattr_list_free(__htmlattr_list__ *list);
 
-/* =========================================================================
- * DOM Node
- * ========================================================================= */
+// DOM Node
 struct html_node_t;
 struct computed_style_t;
 struct layout_box_t;
+
+// UI forward declaration
+typedef struct UI_t __ui__;
+typedef struct html_node_t node_t;
 
 typedef struct html_node_t {
   char *tag;
@@ -91,9 +90,7 @@ void htmlnode_free(__html_node__ *node);
 const char *htmlnode_id(const __html_node__ *node);
 const char *htmlnode_class(const __html_node__ *node);
 
-/* =========================================================================
- * CSS Rule
- * ========================================================================= */
+// CSS Rule
 typedef struct {
   char *property;
   char *value;
@@ -117,9 +114,7 @@ void css_rule_list_init(__css_rule_list__ *list);
 void css_rule_list_add(__css_rule_list__ *list, __css_rule__ rule);
 void css_rule_list_free(__css_rule_list__ *list);
 
-/* =========================================================================
- * Display / flex enums
- * ========================================================================= */
+// Display / flex enums
 typedef enum {
   DISPLAY_BLOCK,
   DISPLAY_FLEX,
@@ -180,7 +175,7 @@ typedef enum {
 #define ALIGN_SELF_AUTO ((int)-1)
 
 typedef struct computed_style_t {
-  /* Box model */
+  // Box model
   float width, height;
   float min_width, min_height;
   float max_width, max_height;
@@ -189,12 +184,12 @@ typedef struct computed_style_t {
   float border_width[4];
   float border_radius[4];
 
-  /* Colors */
-  Color background_color;
-  Color color;
-  Color border_color[4];
+  // Colors
+  __color__ background_color;
+  __color__ color;
+  __color__ border_color[4];
 
-  /* Typography — use NAN / NULL / -1 as "not set" sentinels */
+  // Typography — use NAN / NULL / -1 as "not set" sentinels
   float font_size;   /* NAN = not set */
   char *font_family; /* NULL = not set */
   float line_height; /* NAN = not set */
@@ -240,12 +235,9 @@ typedef struct computed_style_t {
 
 __computed_style__ computed_style_defaults(void);
 
-/* FIX: proper destructor that also frees font_family heap string */
 void computed_style_free(__computed_style__ *s);
 
-/* =========================================================================
- * LayoutBox
- * ========================================================================= */
+// LayoutBox
 typedef struct layout_box_t {
   float x, y;
   float width, height;
@@ -253,9 +245,7 @@ typedef struct layout_box_t {
   float content_width, content_height;
 } LayoutBox;
 
-/* =========================================================================
- * DrawCommand / display list
- * ========================================================================= */
+// DrawCommand / display list
 typedef enum {
   CMD_RECT,
   CMD_TEXT,
@@ -268,14 +258,14 @@ typedef struct {
   __draw_cmd_type__ type;
   float x, y, w, h;
 
-  Color fill_color;
-  Color border_color;
+  __color__ fill_color;
+  __color__ border_color;
   float border_width;
   float border_radius;
 
   char *text;
   float font_size;
-  Color text_color;
+  __color__ text_color;
   char *font_family;
   int text_align;
 
@@ -294,10 +284,4 @@ void display_list_push(__display_list__ *dl, DrawCommand cmd);
 void display_list_clear(__display_list__ *dl);
 void display_list_free(__display_list__ *dl);
 
-/* =========================================================================
- * UI forward declaration
- * ========================================================================= */
-typedef struct UI_t __ui__;
-typedef struct html_node_t node_t;
-
-#endif /* HTMLUI_INTERNAL_TYPES_H */
+#endif // HTMLUI_INTERNAL_TYPES_H
