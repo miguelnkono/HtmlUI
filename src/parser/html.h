@@ -6,8 +6,6 @@
  *
  * Implementation notes
  * --------------------
- * Milestone 1 ships a hand-written recursive descent parser that handles
- * the subset of HTML needed for UI definitions:
  *
  *   - Elements with attributes  (<div id="x" class="a b">)
  *   - Self-closing tags          (<input type="text" />  <br>)
@@ -17,7 +15,7 @@
  *   - Comments (skipped)
  *   - DOCTYPE (skipped)
  *
- * Later milestones can swap in Gumbo for full HTML5 compliance by
+ * Later can swap in Gumbo for full HTML5 compliance by
  * replacing html_parse_file() with a Gumbo wrapper, keeping the same
  * __html_node__* return type.
  */
@@ -48,7 +46,8 @@ __html_node__ *html_parse_file(const char *path, char *error_buf,
  * @param error_len   Size of error_buf.
  * @return            Root __html_node__*, or NULL on failure.
  */
-__html_node__ *html_parse_string(const char *html, char *error_buf, size_t error_len);
+__html_node__ *html_parse_string(const char *html, char *error_buf,
+                                 size_t error_len);
 
 /**
  * Debug helper: print the DOM tree to stdout with indentation.

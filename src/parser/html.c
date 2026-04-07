@@ -270,7 +270,7 @@ static void parse_children(__parser_t__ *p, __html_node__ *parent) {
       if (matched) {
         if (!at_end(p) && peek(p) == '>')
           advance(p); // consume '>'
-        return; // done with this parent
+        return;       // done with this parent
       }
 
       /* Not our tag — restore position and let parse_node handle it */
@@ -315,7 +315,8 @@ static __html_node__ *parse_node(__parser_t__ *p) {
     return NULL;
   }
 
-  // parsing closing tag. Don't have to return a closing tag since we only register opening tags
+  // parsing closing tag. Don't have to return a closing tag since we only
+  // register opening tags
   if (peek(p) == '<' && peek2(p) == '/') {
     while (!at_end(p) && peek(p) != '>')
       advance(p);
@@ -386,9 +387,8 @@ static __html_node__ *parse_document(__parser_t__ *p) {
 
     /* Otherwise accumulate under a synthetic root */
     if (!root) {
-      __html_node__ *body = htmlnode_create("body");
       root = htmlnode_create("html");
-      htmlnode_append_child(root, body);
+      htmlnode_append_child(root, htmlnode_create("body"));
     }
     htmlnode_append_child(root, node);
   }
@@ -396,9 +396,7 @@ static __html_node__ *parse_document(__parser_t__ *p) {
   return root ? root : htmlnode_create("html");
 }
 
-/*
- * Public API
- * */
+// Public API
 __html_node__ *html_parse_string(const char *html, char *error_buf,
                                  size_t error_len) {
   if (!html) {
@@ -434,7 +432,6 @@ __html_node__ *html_parse_file(const char *path, char *error_buf,
     return NULL;
   }
 
-  /* Read whole file */
   fseek(f, 0, SEEK_END);
   long size = ftell(f);
   rewind(f);
